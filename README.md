@@ -51,3 +51,5 @@ docker compose up --build
 ```
 
 См. также: `SECURITY.md`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml`.
+
+hw1 changes to commit
