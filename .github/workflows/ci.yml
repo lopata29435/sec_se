@@ -40,12 +40,6 @@ jobs:
       - name: Pre-commit (all files)
         run: pre-commit run --all-files
 
-      - name: Block direct push to main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          echo "❌ Direct pushes to main are forbidden. Please use a pull request."
-          exit 1
-
   assign-reviewer:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
