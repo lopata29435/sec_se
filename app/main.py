@@ -5,7 +5,21 @@ from typing import Optional
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-app = FastAPI(title="Habit Tracker API", version="0.1.0")
+# Middleware безопасности из контролей модели угроз
+# Раскомментировать для активации (сейчас отключено для совместимости)
+# from app.security import RateLimitMiddleware, SecurityHeadersMiddleware,
+#     MAX_HABITS_PER_USER, validate_resource_quota
+
+app = FastAPI(
+    title="Habit Tracker API",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+# Middleware безопасности (NFR-03, R02) - Отключено, раскомментировать для активации
+# app.add_middleware(RateLimitMiddleware, requests_per_minute=100)
+# app.add_middleware(SecurityHeadersMiddleware)
 
 
 class ApiError(Exception):
