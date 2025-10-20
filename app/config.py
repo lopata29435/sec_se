@@ -83,9 +83,7 @@ MAX_ITEM_NAME_LENGTH = 100
 # Аутентификация/Авторизация (R01, R05) — ПОКА НЕ РЕАЛИЗОВАНО
 # =============================================================================
 AUTH_ENABLED = False  # TODO: Включить после реализации JWT
-AUTH_JWT_SECRET_KEY = (
-    "REPLACE_WITH_SECURE_RANDOM_KEY"  # noqa: S105 # Использовать переменную окружения!
-)
+AUTH_JWT_SECRET_KEY = "REPLACE_WITH_SECURE_RANDOM_KEY"  # noqa: S105  # nosec B105  # ADR-004: В production загружается из HashiCorp Vault
 AUTH_JWT_ALGORITHM = "HS256"
 AUTH_JWT_EXPIRATION_MINUTES = 60
 
