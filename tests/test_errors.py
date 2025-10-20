@@ -9,11 +9,18 @@ def test_not_found_item():
     r = client.get("/items/999")
     assert r.status_code == 404
     body = r.json()
-    assert "error" in body and body["error"]["code"] == "not_found"
+    # RFC 7807 формат
+    assert "type" in body
+    assert "not-found" in body["type"]
+    assert body["status"] == 404
+    assert "correlation_id" in body
 
 
 def test_validation_error():
-    r = client.post("/items", params={"name": ""})
+    r = client.post("/items", json={"name": ""})
     assert r.status_code == 422
     body = r.json()
-    assert body["error"]["code"] == "validation_error"
+    # RFC 7807 формат
+    assert "type" in body
+    assert "validation" in body["type"]
+    assert body["status"] == 422

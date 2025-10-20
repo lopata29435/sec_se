@@ -4,7 +4,23 @@ target-version = "py311"
 exclude = ["venv",".venv","build","dist"]
 
 [tool.ruff.lint]
-select = ["E","F","W","I"]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security checks)
+    "C90", # mccabe complexity
+]
+
+# Игнорировать некоторые правила безопасности для учебного проекта
+ignore = [
+    "S101",  # Use of assert (используется в pytest)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]  # Разрешить assert в тестах
 
 [tool.isort]
 profile = "black"

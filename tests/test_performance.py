@@ -90,7 +90,7 @@ def test_post_habits_performance_baseline():
         )
         end = time.perf_counter()
 
-        assert response.status_code == 200
+        assert response.status_code == 201  # Изменено с 200 на 201 (Created)
         response_times.append((end - start) * 1000)
 
     p50 = median(response_times)
