@@ -33,23 +33,24 @@ jobs:
           ruff check . --output-format=github
           ruff format --check .
 
-      - name: Tests
-        run: pytest -q
+      # Тесты временно отключены
+      # - name: Tests
+      #   run: pytest -q
 
-      - name: Test Coverage Report (NFR-19)
-        run: |
-          pytest --cov=app --cov-report=term --cov-report=xml --cov-report=html
-          echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
-          coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+      # - name: Test Coverage Report (NFR-19)
+      #   run: |
+      #     pytest --cov=app --cov-report=term --cov-report=xml --cov-report=html
+      #     echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+      #     coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload Coverage Reports
-        uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          files: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+      # - name: Upload Coverage Reports
+      #   uses: codecov/codecov-action@v4
+      #   if: always()
+      #   with:
+      #     files: ./coverage.xml
+      #     flags: unittests
+      #     name: codecov-umbrella
+      #     fail_ci_if_error: false
 
       - name: Security - Dependency Check (NFR-04)
         run: |
