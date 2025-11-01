@@ -70,9 +70,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Добавить заголовки лимита в ответ
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(limit)
-        response.headers["X-RateLimit-Remaining"] = str(
-            limit - len(self.requests[client_ip])
-        )
+        response.headers["X-RateLimit-Remaining"] = str(limit - len(self.requests[client_ip]))
 
         return response
 
@@ -110,9 +108,7 @@ MAX_TRACKING_RECORDS_PER_HABIT = 10000  # Смягчает T15.3: Исчерпа
 MAX_REQUEST_SIZE_MB = 1  # Смягчает T3.2: DoS через большие payload
 
 
-def validate_resource_quota(
-    current_count: int, max_count: int, resource_type: str
-) -> None:
+def validate_resource_quota(current_count: int, max_count: int, resource_type: str) -> None:
     """
     Валидация лимитов квот ресурсов (R06)
     Raises:

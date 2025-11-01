@@ -1,13 +1,50 @@
-"""
-Модели данных с валидацией для Habit Tracker API
-P06: Валидация и нормализация ввода
-"""
-
 from datetime import date, datetime
 from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
+from app.database import Base
+
+
+# SQLAlchemy models
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    is_active = Column(Boolean, default=True)
+    habits = relationship("Habit", back_populates="owner")
+
+
+class Habit(Base):
+    __tablename__ = "habits"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    description = Column(String, default="")
+    frequency = Column(String, default="daily")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    target_count = Column(Integer, nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="habits")
+    tracking_records = relationship("TrackingRecord", back_populates="habit")
+
+
+class TrackingRecord(Base):
+    __tablename__ = "tracking_records"
+    id = Column(Integer, primary_key=True, index=True)
+    habit_id = Column(Integer, ForeignKey("habits.id"))
+    completed_date = Column(Date, default=date.today)
+    count = Column(Integer, default=1)
+    notes = Column(String, default="")
+    tracked_at = Column(DateTime, default=datetime.utcnow)
+    habit = relationship("Habit", back_populates="tracking_records")
+
+
+# Pydantic models
 
 
 class FrequencyType(str, Enum):
@@ -117,13 +154,9 @@ class TrackingCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     habit_id: int = Field(..., ge=1, description="ID привычки")
-    completed_date: date = Field(
-        default_factory=date.today, description="Дата выполнения (UTC)"
-    )
+    completed_date: date = Field(default_factory=date.today, description="Дата выполнения (UTC)")
     count: int = Field(default=1, ge=1, le=100, description="Количество выполнений")
-    notes: str = Field(
-        default="", max_length=200, description="Заметки (максимум 200 символов)"
-    )
+    notes: str = Field(default="", max_length=200, description="Заметки (максимум 200 символов)")
 
     @field_validator("completed_date")
     @classmethod
@@ -193,15 +226,18 @@ class ErrorDetail(BaseModel):
     title: str = Field(..., description="Краткое описание проблемы")
     status: int = Field(..., description="HTTP статус код")
     detail: str = Field(..., description="Детальное объяснение проблемы")
-    instance: str = Field(
-        ..., description="URI идентифицирующий конкретный случай проблемы"
-    )
+    instance: str = Field(..., description="URI идентифицирующий конкретный случай проблемы")
     correlation_id: Optional[str] = Field(None, description="ID для корреляции в логах")
 
 
-class HealthResponse(BaseModel):
-    """Ответ health-check endpoint"""
+class UserCreate(BaseModel):
+    username: str
+    password: str
 
-    status: str
-    timestamp: datetime
-    version: str = "0.1.0"
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)

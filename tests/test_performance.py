@@ -2,46 +2,35 @@
 Performance tests for Habit Tracker API
 
 These tests verify NFR-07, NFR-08, NFR-09 requirements:
-- NFR-07: GET /habits p95 ≤ 200ms @ 50 RPS
-- NFR-08: POST /habits p95 ≤ 300ms @ 50 RPS
-- NFR-09: GET /habits/{id}/stats p95 ≤ 500ms @ 50 RPS
+- NFR-07: GET /habits p95 <= 200ms @ 50 RPS
+- NFR-08: POST /habits p95 <= 300ms @ 50 RPS
+- NFR-09: GET /habits/{id}/stats p95 <= 500ms @ 50 RPS
 
 Run with: pytest tests/test_performance.py -v -m performance
 Skip with: pytest tests/ -m "not performance"
 """
 
 import time
+from datetime import date, timedelta
 from statistics import median, quantiles
 
 import pytest
-from fastapi.testclient import TestClient
-
-from app.main import _HABITS_DB, app
-
-client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def setup_performance_test():
-    """Clean database before each performance test"""
-    _HABITS_DB["habits"].clear()
-    _HABITS_DB["tracking_records"].clear()
-    _HABITS_DB["next_habit_id"] = 1
-    _HABITS_DB["next_record_id"] = 1
-    yield
 
 
 @pytest.mark.performance
-def test_get_habits_performance_baseline():
+def test_get_habits_performance_baseline(authenticated_client):
     """
     NFR-07: GET /habits response time baseline
 
-    Target: p95 ≤ 200ms @ 50 RPS
+    Target: p95 <= 200ms @ 50 RPS
     This is a baseline test without actual load generation
     """
     # Setup: Create some test data
     for i in range(10):
-        client.post("/habits", params={"name": f"Habit {i}", "description": "Test"})
+        authenticated_client.post(
+            "/habits",
+            json={"name": f"Habit {i}", "description": "Test", "frequency": "daily"},
+        )
 
     # Measure response times
     response_times = []
@@ -49,7 +38,7 @@ def test_get_habits_performance_baseline():
 
     for _ in range(iterations):
         start = time.perf_counter()
-        response = client.get("/habits")
+        response = authenticated_client.get("/habits")
         end = time.perf_counter()
 
         assert response.status_code == 200
@@ -63,10 +52,10 @@ def test_get_habits_performance_baseline():
     )
 
     # Report metrics
-    print("\n📊 GET /habits Performance Metrics:")
+    print("\n GET /habits Performance Metrics:")
     print(f"   Iterations: {iterations}")
     print(f"   p50: {p50:.2f}ms")
-    print(f"   p95: {p95:.2f}ms (target: ≤200ms)")
+    print(f"   p95: {p95:.2f}ms (target: <=200ms)")
     print(f"   p99: {p99:.2f}ms")
 
     # Assert NFR-07 requirement
@@ -74,23 +63,28 @@ def test_get_habits_performance_baseline():
 
 
 @pytest.mark.performance
-def test_post_habits_performance_baseline():
+def test_post_habits_performance_baseline(authenticated_client):
     """
     NFR-08: POST /habits response time baseline
 
-    Target: p95 ≤ 300ms @ 50 RPS
+    Target: p95 <= 300ms @ 50 RPS
     """
     response_times = []
     iterations = 50
 
     for i in range(iterations):
         start = time.perf_counter()
-        response = client.post(
-            "/habits", params={"name": f"Perf Test Habit {i}", "description": "Test"}
+        response = authenticated_client.post(
+            "/habits",
+            json={
+                "name": f"Perf Test Habit {i}",
+                "description": "Test",
+                "frequency": "daily",
+            },
         )
         end = time.perf_counter()
 
-        assert response.status_code == 201  # Изменено с 200 на 201 (Created)
+        assert response.status_code == 201
         response_times.append((end - start) * 1000)
 
     p50 = median(response_times)
@@ -99,37 +93,42 @@ def test_post_habits_performance_baseline():
         quantiles(response_times, n=100)[98],
     )
 
-    print("\n📊 POST /habits Performance Metrics:")
+    print("\n POST /habits Performance Metrics:")
     print(f"   Iterations: {iterations}")
     print(f"   p50: {p50:.2f}ms")
-    print(f"   p95: {p95:.2f}ms (target: ≤300ms)")
+    print(f"   p95: {p95:.2f}ms (target: <=300ms)")
     print(f"   p99: {p99:.2f}ms")
 
     assert p95 <= 300, f"NFR-08 failed: p95 {p95:.2f}ms exceeds 300ms threshold"
 
 
 @pytest.mark.performance
-def test_get_stats_performance_baseline():
+def test_get_stats_performance_baseline(authenticated_client):
     """
     NFR-09: GET /habits/{id}/stats response time baseline
 
-    Target: p95 ≤ 500ms @ 50 RPS
+    Target: p95 <= 500ms @ 50 RPS
     """
-    habit_resp = client.post("/habits", params={"name": "Stats Test Habit"})
+    habit_resp = authenticated_client.post(
+        "/habits",
+        json={"name": "Stats Test Habit", "frequency": "daily"},
+    )
     habit_id = habit_resp.json()["id"]
 
+    # Create 30 tracking records
     for i in range(30):
-        from datetime import date, timedelta
-
         track_date = (date.today() - timedelta(days=i)).isoformat()
-        client.post(f"/habits/{habit_id}/track", params={"completed_at": track_date})
+        authenticated_client.post(
+            f"/habits/{habit_id}/track",
+            json={"completed_date": track_date, "count": 1},
+        )
 
     response_times = []
     iterations = 100
 
     for _ in range(iterations):
         start = time.perf_counter()
-        response = client.get(f"/habits/{habit_id}/stats")
+        response = authenticated_client.get(f"/habits/{habit_id}/stats")
         end = time.perf_counter()
 
         assert response.status_code == 200
@@ -141,11 +140,11 @@ def test_get_stats_performance_baseline():
         quantiles(response_times, n=100)[98],
     )
 
-    print("\n📊 GET /habits/{id}/stats Performance Metrics:")
+    print("\n GET /habits/{id}/stats Performance Metrics:")
     print(f"   Iterations: {iterations}")
     print("   Data points: 30 tracking records")
     print(f"   p50: {p50:.2f}ms")
-    print(f"   p95: {p95:.2f}ms (target: ≤500ms)")
+    print(f"   p95: {p95:.2f}ms (target: <=500ms)")
     print(f"   p99: {p99:.2f}ms")
 
     assert p95 <= 500, f"NFR-09 failed: p95 {p95:.2f}ms exceeds 500ms threshold"
@@ -153,7 +152,7 @@ def test_get_stats_performance_baseline():
 
 @pytest.mark.performance
 @pytest.mark.slow
-def test_concurrent_requests_simulation():
+def test_concurrent_requests_simulation(authenticated_client):
     """
     Simulate concurrent requests to verify system handles load
 
@@ -164,11 +163,14 @@ def test_concurrent_requests_simulation():
 
     # Setup
     for i in range(5):
-        client.post("/habits", params={"name": f"Concurrent Test {i}"})
+        authenticated_client.post(
+            "/habits",
+            json={"name": f"Concurrent Test {i}", "frequency": "daily"},
+        )
 
     def make_request():
         start = time.perf_counter()
-        response = client.get("/habits")
+        response = authenticated_client.get("/habits")
         end = time.perf_counter()
         return response.status_code, (end - start) * 1000
 
@@ -182,7 +184,7 @@ def test_concurrent_requests_simulation():
     success_rate = sum(1 for s in status_codes if s == 200) / len(status_codes) * 100
     p95 = quantiles(response_times, n=100)[94]
 
-    print("\n📊 Concurrent Requests Simulation:")
+    print("\n Concurrent Requests Simulation:")
     print(f"   Total requests: {len(results)}")
     print(f"   Success rate: {success_rate:.1f}%")
     print(f"   p95 response time: {p95:.2f}ms")

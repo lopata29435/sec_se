@@ -1,2 +1,9 @@
 fastapi==0.112.2
 uvicorn==0.30.5
+sqlalchemy
+psycopg2-binary
+alembic
+python-jose[cryptography]
+passlib[argon2]
+python-multipart
+prometheus-client

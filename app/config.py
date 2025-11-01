@@ -13,7 +13,7 @@ USE_RFC7807_ERRORS = os.getenv("USE_RFC7807_ERRORS", "true").lower() == "true"
 # Ограничение частоты запросов (NFR-03, R02)
 # Смягчает: T1.4 (DDoS), T8.3 (Флуд ошибками), T10.3 (Флуд отслеживанием)
 # =============================================================================
-RATE_LIMIT_ENABLED = True  # Установить True для активации
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
 RATE_LIMIT_REQUESTS_PER_MINUTE = 100  # На IP адрес
 RATE_LIMIT_HEALTH_CHECK_MULTIPLIER = 10  # /health получает в 10 раз больший лимит
 
@@ -45,7 +45,7 @@ ERROR_LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 # Логирование аудита (R07)
 # Смягчает: T5.4 (Отказ от действий), T13.3 (Отказ от обновлений)
 # =============================================================================
-AUDIT_LOG_ENABLED = False  # Установить True для активации
+AUDIT_LOG_ENABLED = True  # Включено для продакшна
 AUDIT_LOG_ACTIONS = ["CREATE", "UPDATE", "DELETE"]  # Действия для логирования
 AUDIT_LOG_RETENTION_DAYS = 90
 
@@ -80,23 +80,23 @@ MAX_HABIT_DESCRIPTION_LENGTH = 500
 MAX_ITEM_NAME_LENGTH = 100
 
 # =============================================================================
-# Аутентификация/Авторизация (R01, R05) — ПОКА НЕ РЕАЛИЗОВАНО
+# Аутентификация/Авторизация (R01, R05)
 # =============================================================================
-AUTH_ENABLED = False  # TODO: Включить после реализации JWT
-AUTH_JWT_SECRET_KEY = "REPLACE_WITH_SECURE_RANDOM_KEY"  # noqa: S105  # nosec B105  # ADR-004: В production загружается из HashiCorp Vault
+AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() == "true"
+AUTH_JWT_SECRET_KEY = os.getenv("AUTH_JWT_SECRET_KEY", "REPLACE_WITH_SECURE_RANDOM_KEY")  # noqa: S105  # nosec B105  # ADR-004: В production загружается из HashiCorp Vault
 AUTH_JWT_ALGORITHM = "HS256"
 AUTH_JWT_EXPIRATION_MINUTES = 60
 
 # =============================================================================
 # База данных (R12)
 # =============================================================================
-USE_PERSISTENT_DB = False  # True = PostgreSQL, False = In-Memory
-DATABASE_URL = "postgresql://user:pass@localhost/habitdb"  # Для будущего использования
+USE_PERSISTENT_DB = True  # Переключено на персистентную БД
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/habit_tracker")
 
 # =============================================================================
 # Мониторинг и наблюдаемость
 # =============================================================================
-METRICS_ENABLED = False
+METRICS_ENABLED = True  # Включено для продакшна
 METRICS_PORT = 9090
 HEALTH_CHECK_TIMEOUT_SECONDS = 5
 
@@ -104,9 +104,7 @@ HEALTH_CHECK_TIMEOUT_SECONDS = 5
 # Разработка vs Продакшн
 # =============================================================================
 
-ENVIRONMENT = os.getenv(
-    "ENVIRONMENT", "development"
-)  # development, staging, production
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")  # development, staging, production
 
 # Переопределение настроек для продакшена
 if ENVIRONMENT == "production":
@@ -115,5 +113,5 @@ if ENVIRONMENT == "production":
     SHOW_STACK_TRACES = False
     MASK_INTERNAL_ERRORS = True
     AUDIT_LOG_ENABLED = True
-    AUTH_ENABLED = True  # Когда будет реализовано
+    AUTH_ENABLED = True
     USE_PERSISTENT_DB = True
