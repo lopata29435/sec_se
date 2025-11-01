@@ -31,14 +31,9 @@ jobs:
           ruff check . --output-format=github
         continue-on-error: false
 
-      - name: Check code formatting with black
+      - name: Check code formatting with ruff
         run: |
-          black --check app tests
-        continue-on-error: false
-
-      - name: Check import sorting with isort
-        run: |
-          isort --check-only app tests
+          ruff format --check .
         continue-on-error: false
 
       - name: Security scan with bandit
