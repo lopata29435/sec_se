@@ -15,7 +15,6 @@ uvicorn app.main:app --reload
 ```bash
 ruff check --fix .
 black .
-isort .
 pytest -q
 pre-commit run --all-files
 ```

@@ -11,6 +11,18 @@ services:
     environment:
       - DATABASE_URL=postgresql://user:password@db/habit_tracker
       - PYTHONUNBUFFERED=1
+      - AUDIT_LOG_PATH=/app/logs/audit.log
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    volumes:
+      - app_logs:/app/logs
     profiles: ["dev"]
 
   db:
@@ -31,3 +43,4 @@ services:
 
 volumes:
   postgres_data:
+  app_logs:

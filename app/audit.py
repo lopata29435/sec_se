@@ -5,6 +5,7 @@
 
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -19,8 +20,12 @@ formatter = logging.Formatter(
     '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "message": %(message)s}'
 )
 
-# Хендлер для записи в файл
-file_handler = logging.FileHandler("audit.log")
+# Хендлер для записи в файл (путь можно переопределить переменной окружения)
+_audit_log_path = os.getenv("AUDIT_LOG_PATH", "audit.log")
+_audit_dir = os.path.dirname(_audit_log_path)
+if _audit_dir:
+    os.makedirs(_audit_dir, exist_ok=True)
+file_handler = logging.FileHandler(_audit_log_path)
 file_handler.setFormatter(formatter)
 audit_logger.addHandler(file_handler)
 
