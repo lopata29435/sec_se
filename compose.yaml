@@ -1,8 +1,46 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
+      - DATABASE_URL=postgresql://user:password@db/habit_tracker
       - PYTHONUNBUFFERED=1
+      - AUDIT_LOG_PATH=/app/logs/audit.log
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    volumes:
+      - app_logs:/app/logs
     profiles: ["dev"]
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=habit_tracker
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d habit_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  app_logs:

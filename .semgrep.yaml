@@ -1,2 +1,26 @@
-# Baseline Semgrep config (extend in P10)
-rules: []
+# Semgrep security rules configuration
+rules:
+  - id: hardcoded-secret
+    patterns:
+      - pattern: password = "..."
+      - pattern: secret = "..."
+      - pattern: api_key = "..."
+    message: "Potential hardcoded secret detected"
+    languages: [python]
+    severity: WARNING
+
+  - id: sql-injection
+    patterns:
+      - pattern: execute("..." + $VAR)
+      - pattern: query("..." + $VAR)
+    message: "Potential SQL injection vulnerability"
+    languages: [python]
+    severity: ERROR
+
+  - id: unsafe-deserialization
+    patterns:
+      - pattern: pickle.loads(...)
+      - pattern: yaml.load(...)
+    message: "Unsafe deserialization detected"
+    languages: [python]
+    severity: ERROR

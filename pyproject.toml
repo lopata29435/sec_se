@@ -3,12 +3,41 @@ line-length = 100
 target-version = "py311"
 exclude = ["venv",".venv","build","dist"]
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
 [tool.ruff.lint]
-select = ["E","F","W","I"]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security checks)
+    "C90", # mccabe complexity
+]
+
+# Игнорировать некоторые правила безопасности для учебного проекта
+ignore = [
+    "S101",  # Use of assert (используется в pytest)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]  # Разрешить assert в тестах
 
 [tool.isort]
 profile = "black"
 line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_gitignore = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
