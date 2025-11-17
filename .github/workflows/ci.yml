@@ -182,18 +182,4 @@ jobs:
           echo "- **NFR-04**: Security vulnerabilities scanned" >> $GITHUB_STEP_SUMMARY
           echo "- **NFR-21**: Static security analysis completed" >> $GITHUB_STEP_SUMMARY
 
-  assign-reviewer:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Assign @DaniilCS as reviewer
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            github.rest.pulls.requestReviewers({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              reviewers: ['DaniilCS']
-            });
+  # assign-reviewer job removed per request
