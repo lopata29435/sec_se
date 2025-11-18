@@ -79,7 +79,6 @@ jobs:
 
   build-test-selfhosted:
     name: Build & Test (Self-Hosted)
-    # Adjust labels to match your self-hosted runner registration
     runs-on: [self-hosted]
     steps:
       - name: Checkout
