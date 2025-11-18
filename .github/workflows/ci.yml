@@ -49,7 +49,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
-          pip install build coverage junit-xml
+          pip install coverage junit-xml
 
       - name: Lint & Format
         run: |
@@ -62,10 +62,6 @@ jobs:
           pytest -q --maxfail=1 --disable-warnings --junitxml=reports/junit-${{ matrix.os }}-${{ matrix.python }}.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
           coverage xml -o coverage-${{ matrix.os }}-${{ matrix.python }}.xml
 
-      - name: Build wheel
-        run: |
-          python -m build
-
       - name: Collect artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -75,7 +71,7 @@ jobs:
             reports/*.xml
             coverage-${{ matrix.os }}-${{ matrix.python }}.xml
             htmlcov/**
-            dist/**
+
 
   build-test-selfhosted:
     name: Build & Test (Self-Hosted)
@@ -102,7 +98,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
-          pip install build coverage junit-xml
+          pip install coverage junit-xml
 
       - name: Lint & Format
         run: |
@@ -114,10 +110,6 @@ jobs:
           mkdir -p reports
           pytest -q --maxfail=1 --disable-warnings --junitxml=reports/junit-selfhosted-3.12.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
           coverage xml -o coverage-selfhosted-3.12.xml
-
-      - name: Build wheel
-        run: |
-          python -m build
 
       - name: Collect artifacts
         if: always()
@@ -258,6 +250,6 @@ jobs:
           echo "### C3 Secrets & Configs" >> $GITHUB_STEP_SUMMARY
           echo "- Secrets referenced via \\${{ secrets.* }} (masked)" >> $GITHUB_STEP_SUMMARY
           echo "### C4 Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Test reports, coverage HTML, wheels, security scan outputs, image tar, deploy log" >> $GITHUB_STEP_SUMMARY
+          echo "- Test reports, coverage HTML, security scan outputs, image tar, deploy log" >> $GITHUB_STEP_SUMMARY
           echo "### C5 CD / Promotion" >> $GITHUB_STEP_SUMMARY
           echo "- Mock staging deploy job completed with environment separation" >> $GITHUB_STEP_SUMMARY
