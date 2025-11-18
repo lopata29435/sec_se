@@ -1,185 +1,264 @@
-name: CI / build
+name: CI
 on:
-  pull_request:
   push:
     branches: [main]
+  pull_request:
 
 permissions:
   contents: read
-  pull-requests: write
+  packages: write
+  security-events: write
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+env:
+  DATABASE_URL: ${{ secrets.DB_URL }}
+  AUTH_JWT_SECRET_KEY: ${{ secrets.JWT_SECRET }}
+  ENVIRONMENT: ${{ vars.ENVIRONMENT || 'development' }}
 
-      - uses: actions/setup-python@v5
+jobs:
+  build-test:
+    name: Build & Test (Python ${{ matrix.python }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
+          python-version: ${{ matrix.python }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python }}-${{ hashFiles('pyproject.toml', '**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python }}-
+            ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
+          pip install build coverage junit-xml
 
       - name: Lint & Format
         run: |
           ruff check . --output-format=github
           ruff format --check .
 
-      # Тесты временно отключены
-      # - name: Tests
-      #   run: pytest -q
-
-      # - name: Test Coverage Report (NFR-19)
-      #   run: |
-      #     pytest --cov=app --cov-report=term --cov-report=xml --cov-report=html
-      #     echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
-      #     coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
-
-      # - name: Upload Coverage Reports
-      #   uses: codecov/codecov-action@v4
-      #   if: always()
-      #   with:
-      #     files: ./coverage.xml
-      #     flags: unittests
-      #     name: codecov-umbrella
-      #     fail_ci_if_error: false
-
-      - name: Security - Dependency Check (NFR-04)
+      - name: Run tests with coverage & junit
         run: |
-          pip install safety
-          safety check --json || true
-          echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
-          echo "Checked for known vulnerabilities in dependencies" >> $GITHUB_STEP_SUMMARY
+          mkdir -p reports
+          pytest -q --maxfail=1 --disable-warnings --junitxml=reports/junit-${{ matrix.os }}-${{ matrix.python }}.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+          coverage xml -o coverage-${{ matrix.os }}-${{ matrix.python }}.xml
 
-      - name: Security - Bandit Static Analysis (NFR-21)
+      - name: Build wheel
         run: |
-          pip install bandit
+          python -m build
+
+      - name: Collect artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-test-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            reports/*.xml
+            coverage-${{ matrix.os }}-${{ matrix.python }}.xml
+            htmlcov/**
+            dist/**
+
+  build-test-selfhosted:
+    name: Build & Test (Self-Hosted)
+    # Adjust labels to match your self-hosted runner registration
+    runs-on: [self-hosted]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: selfhosted-pip-3.12-${{ hashFiles('pyproject.toml', '**/requirements*.txt') }}
+          restore-keys: |
+            selfhosted-pip-3.12-
+            selfhosted-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install build coverage junit-xml
+
+      - name: Lint & Format
+        run: |
+          ruff check . --output-format=github
+          ruff format --check .
+
+      - name: Run tests with coverage & junit
+        run: |
+          mkdir -p reports
+          pytest -q --maxfail=1 --disable-warnings --junitxml=reports/junit-selfhosted-3.12.xml --cov=app --cov-report=xml --cov-report=html --cov-report=term
+          coverage xml -o coverage-selfhosted-3.12.xml
+
+      - name: Build wheel
+        run: |
+          python -m build
+
+      - name: Collect artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-test-selfhosted
+          path: |
+            reports/*.xml
+            coverage-selfhosted-3.12.xml
+            htmlcov/**
+            dist/**
+
+  security-scans:
+    name: Security Scans (Ubuntu only)
+    runs-on: ubuntu-latest
+    needs: [build-test, build-test-selfhosted]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install scan deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit semgrep trufflehog
+      - name: Safety (SCA)
+        run: |
+          safety check --json > safety.json || true
+      - name: Bandit (SAST)
+        run: |
           bandit -r app/ -f json -o bandit-report.json || true
-          bandit -r app/ || true
-
-      - name: Security - Semgrep SAST Scan
+      - name: Semgrep (SAST)
         run: |
-          pip install semgrep
           semgrep --config=auto app/ --json -o semgrep-report.json || true
           semgrep --config=auto app/ --sarif -o semgrep.sarif || true
-          echo "## 🔒 Semgrep SAST Results" >> $GITHUB_STEP_SUMMARY
-          semgrep --config=auto app/ || echo "Semgrep found issues - check logs" >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@v3
+      - name: TruffleHog (Secrets)
+        run: |
+          trufflehog filesystem . --json --only-verified > trufflehog-results.json || true
+      - name: Upload scan artifacts
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scans
+          path: |
+            safety.json
+            bandit-report.json
+            semgrep-report.json
+            semgrep.sarif
+            trufflehog-results.json
+      - name: Upload Semgrep SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
         continue-on-error: true
 
-      - name: Security - Trivy Dependency Scan
-        uses: aquasecurity/trivy-action@master
+  docker-image:
+    name: Build Docker Image (cache & save)
+    runs-on: ubuntu-latest
+    needs: [build-test, build-test-selfhosted]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Cache Docker layers
+        uses: actions/cache@v4
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-        continue-on-error: true
-
-      - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+          path: /tmp/.buildx-cache
+          key: buildx-${{ github.sha }}
+          restore-keys: |
+            buildx-
+      - name: Build image
+        uses: docker/build-push-action@v5
         with:
-          sarif_file: trivy-results.sarif
-        continue-on-error: true
-
-      - name: Security - Trivy Detailed Report
+          context: .
+          file: Dockerfile
+          push: false
+          tags: ${{ github.repository }}:ci-${{ github.run_id }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+      - name: Move new cache
         run: |
-          # Install Trivy
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install trivy -y
-
-          echo "## 🔒 Trivy Vulnerability Scan" >> $GITHUB_STEP_SUMMARY
-          # Scan dependencies
-          trivy fs --severity HIGH,CRITICAL --format table . >> $GITHUB_STEP_SUMMARY || true
-        continue-on-error: true
-
-      - name: Security - TruffleHog Secret Scan
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+      - name: Save image tar
         run: |
-          pip install trufflehog
-          echo "## 🔒 TruffleHog Secret Scan" >> $GITHUB_STEP_SUMMARY
-          trufflehog filesystem . --json --only-verified > trufflehog-results.json || true
-          if [ -s trufflehog-results.json ]; then
-            echo "⚠️ Secrets detected!" >> $GITHUB_STEP_SUMMARY
-            cat trufflehog-results.json >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ No secrets detected" >> $GITHUB_STEP_SUMMARY
-          fi
-        continue-on-error: true
+          docker save ${{ github.repository }}:ci-${{ github.run_id }} -o image.tar
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar
 
-      - name: Build Docker Image for DAST
+  deploy-staging:
+    name: Mock Staging Deploy
+    runs-on: ubuntu-latest
+    environment: staging
+    needs: [build-test, build-test-selfhosted, docker-image]
+    env:
+      DATABASE_URL: ${{ secrets.STAGING_DB_URL }}
+      AUTH_JWT_SECRET_KEY: ${{ secrets.STAGING_JWT_SECRET }}
+      ENVIRONMENT: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: .
+      - name: Load image
         run: |
-          docker build -t habit-tracker:test .
-        continue-on-error: true
-
-      - name: Security - OWASP ZAP DAST Scan
+          docker load -i image.tar
+      - name: Deploy (mock)
         run: |
-          # Start application in Docker
-          docker run -d --name habit-tracker-test -p 8000:8000 \
-            -e DATABASE_URL=sqlite:///./test.db \
-            habit-tracker:test
+          echo "Deploying image to staging (mock)" > deploy.log
+          echo "Using DATABASE_URL=${DATABASE_URL}" >> deploy.log
+          echo "Image tag: ${{ github.repository }}:ci-${{ github.run_id }}" >> deploy.log
+          # Simulate health check
+          echo "Health check passed" >> deploy.log
+      - name: Upload deploy log
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-deploy
+          path: deploy.log
 
-          # Wait for app to start
-          sleep 10
-
-          # Run ZAP baseline scan
-          docker run --network host -v $(pwd):/zap/wrk/:rw \
-            -t ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://localhost:8000 \
-            -r zap-report.html || true
-
-          # Stop test container
-          docker stop habit-tracker-test || true
-          docker rm habit-tracker-test || true
-
-          echo "## 🔒 DAST Scan Completed" >> $GITHUB_STEP_SUMMARY
-          echo "ZAP baseline scan executed against running application" >> $GITHUB_STEP_SUMMARY
-        continue-on-error: true
-
-      - name: Performance - API Response Time Check (NFR-07, NFR-08)
+  summary:
+    name: Summary & Compliance
+    runs-on: ubuntu-latest
+    needs: [build-test, build-test-selfhosted, security-scans, docker-image, deploy-staging]
+    steps:
+      - name: Generate summary
         run: |
-          echo "## Performance Metrics" >> $GITHUB_STEP_SUMMARY
-          echo "Running performance baseline tests..." >> $GITHUB_STEP_SUMMARY
-          pytest tests/ -v -m performance --tb=short || echo "No performance tests found"
-
-      - name: Pre-commit (all files)
-        run: pre-commit run --all-files
-
-      - name: NFR Compliance Summary
-        if: always()
-        run: |
-          echo "## ✅ NFR Compliance & Security Check" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Code Quality" >> $GITHUB_STEP_SUMMARY
-          echo "- **NFR-19**: Test Coverage ≥ 80% (Check report above)" >> $GITHUB_STEP_SUMMARY
-          echo "- **NFR-20**: Code linting passed (ruff, black, isort)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Security Scanning (SAST/SCA/DAST)" >> $GITHUB_STEP_SUMMARY
-          echo "- **SAST**: Semgrep static analysis completed ✓" >> $GITHUB_STEP_SUMMARY
-          echo "- **SAST**: Bandit security analysis completed ✓" >> $GITHUB_STEP_SUMMARY
-          echo "- **SCA**: Trivy dependency scan completed ✓" >> $GITHUB_STEP_SUMMARY
-          echo "- **SCA**: Safety vulnerability check completed ✓" >> $GITHUB_STEP_SUMMARY
-          echo "- **Secret Scan**: TruffleHog secret detection completed ✓" >> $GITHUB_STEP_SUMMARY
-          echo "- **DAST**: OWASP ZAP baseline scan completed ✓" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Compliance" >> $GITHUB_STEP_SUMMARY
-          echo "- **NFR-04**: Security vulnerabilities scanned" >> $GITHUB_STEP_SUMMARY
-          echo "- **NFR-21**: Static security analysis completed" >> $GITHUB_STEP_SUMMARY
-
-  # assign-reviewer job removed per request
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "### C1 Build & Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Matrix (OS/Python) executed incl. self-hosted" >> $GITHUB_STEP_SUMMARY
+          echo "### C2 Caching & Concurrency" >> $GITHUB_STEP_SUMMARY
+          echo "- pip & Docker layer caching applied" >> $GITHUB_STEP_SUMMARY
+          echo "### C3 Secrets & Configs" >> $GITHUB_STEP_SUMMARY
+          echo "- Secrets referenced via \\${{ secrets.* }} (masked)" >> $GITHUB_STEP_SUMMARY
+          echo "### C4 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Test reports, coverage HTML, wheels, security scan outputs, image tar, deploy log" >> $GITHUB_STEP_SUMMARY
+          echo "### C5 CD / Promotion" >> $GITHUB_STEP_SUMMARY
+          echo "- Mock staging deploy job completed with environment separation" >> $GITHUB_STEP_SUMMARY
