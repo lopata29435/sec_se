@@ -187,6 +187,7 @@ jobs:
           context: .
           file: Dockerfile
           push: false
+          load: true
           tags: ${{ github.repository }}:ci-${{ github.run_id }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
