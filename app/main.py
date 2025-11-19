@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Response
@@ -263,7 +263,7 @@ def create_habit(
         description=habit.description,
         frequency=(habit.frequency.value if hasattr(habit.frequency, "value") else habit.frequency),
         is_active=True,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         target_count=habit.target_count,
         owner_id=current_user.id,
     )
@@ -416,7 +416,7 @@ def track_habit(
         completed_date=tracking.completed_date,
         count=tracking.count,
         notes=tracking.notes,
-        tracked_at=datetime.utcnow(),
+        tracked_at=datetime.now(timezone.utc),
     )
 
     db.add(tracking_record)

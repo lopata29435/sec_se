@@ -9,10 +9,16 @@ from fastapi.testclient import TestClient
 # ВАЖНО: Установить переменные окружения ДО импорта модулей приложения
 os.environ["RATE_LIMIT_ENABLED"] = "false"  # Отключаем rate limiting для тестов
 os.environ["USE_PERSISTENT_DB"] = "false"  # Используем in-memory DB для тестов
+os.environ["DATABASE_URL"] = "sqlite:///./test.db"  # Локальная файловая SQLite для тестов
 
 ROOT = Path(__file__).resolve().parents[1]  # корень репозитория
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+# Инициализация схемы БД (создание таблиц) перед тестами
+from app.database import Base, engine  # noqa: E402
+
+Base.metadata.create_all(bind=engine)
 
 
 @pytest.fixture(scope="session")
