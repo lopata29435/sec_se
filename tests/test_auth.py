@@ -7,7 +7,7 @@ class TestAuthentication:
     """Тесты для регистрации и входа"""
 
     def test_register_new_user(self, test_client):
-        """Регистрация нового пользователя"""
+        """Регистрация нового пользователя (восстановлено)"""
         response = test_client.post(
             "/register",
             json={
@@ -16,7 +16,6 @@ class TestAuthentication:
                 "password": "SecurePassword123!",
             },
         )
-
         # Может быть 201 если новый, или 400 если уже существует
         assert response.status_code in [201, 400]
 

@@ -6,7 +6,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.config import AUDIT_LOG_ACTIONS, AUDIT_LOG_ENABLED
@@ -70,7 +70,7 @@ def log_audit_event(
         "user_id": user_id,
         "correlation_id": correlation_id,
         "status": status,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     if details:
