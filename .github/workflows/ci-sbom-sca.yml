@@ -1,0 +1,86 @@
+name: Security - SBOM & SCA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "**/*.py"
+      - ".github/workflows/ci-sbom-sca.yml"
+  pull_request:
+    paths:
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "**/*.py"
+      - ".github/workflows/ci-sbom-sca.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sbom-sca-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EVIDENCE_DIR: EVIDENCE/P09
+  SBOM_FILE: EVIDENCE/P09/sbom.json
+  SCA_REPORT: EVIDENCE/P09/sca_report.json
+  SCA_SUMMARY: EVIDENCE/P09/sca_summary.md
+  SYFT_IMAGE: anchore/syft:latest
+  GRYPE_IMAGE: anchore/grype:latest
+
+jobs:
+  sbom-sca:
+    name: Generate SBOM & SCA
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare evidence directory
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          echo "Repository: $GITHUB_REPOSITORY" > $SCA_SUMMARY
+          echo "Commit: $GITHUB_SHA" >> $SCA_SUMMARY
+          echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $SCA_SUMMARY
+          echo "" >> $SCA_SUMMARY
+
+      - name: Generate SBOM (Syft CycloneDX JSON)
+        run: |
+          docker run --rm -v "${PWD}:/work" -w /work "$SYFT_IMAGE" \
+            dir:. -o cyclonedx-json=$SBOM_FILE
+
+      - name: Run SCA on SBOM (Grype)
+        run: |
+          docker run --rm -v "${PWD}:/work" -w /work "$GRYPE_IMAGE" \
+            sbom:/work/$SBOM_FILE -o json > $SCA_REPORT || true
+
+      - name: Build SCA summary (severity aggregation)
+        run: |
+          echo "# SCA summary" >> $SCA_SUMMARY
+          echo "" >> $SCA_SUMMARY
+          if command -v jq >/dev/null 2>&1; then
+            jq '[.matches[].vulnerability.severity] | group_by(.) | map({(.[0]): length}) | add // {}' $SCA_REPORT >> $SCA_SUMMARY || true
+          else
+            echo "jq not available on runner" >> $SCA_SUMMARY
+          fi
+          echo "" >> $SCA_SUMMARY
+          echo "Notes: Generated via Syft+Grype against commit $GITHUB_SHA" >> $SCA_SUMMARY
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-sca-${{ github.run_id }}
+          path: |
+            ${{ env.SBOM_FILE }}
+            ${{ env.SCA_REPORT }}
+            ${{ env.SCA_SUMMARY }}
+
+      - name: Job summary
+        run: |
+          echo "## SBOM & SCA" >> $GITHUB_STEP_SUMMARY
+          echo "- SBOM: $SBOM_FILE (Syft)" >> $GITHUB_STEP_SUMMARY
+          echo "- SCA: $SCA_REPORT (Grype, json)" >> $GITHUB_STEP_SUMMARY
+          echo "- Summary: $SCA_SUMMARY" >> $GITHUB_STEP_SUMMARY
+          echo "- Artifacts: sbom-sca-${GITHUB_RUN_ID}" >> $GITHUB_STEP_SUMMARY

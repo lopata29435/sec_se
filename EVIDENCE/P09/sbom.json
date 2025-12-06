@@ -1,0 +1,6 @@
+{
+  "placeholder": true,
+  "description": "SBOM will be generated automatically by CI (Syft, CycloneDX JSON).",
+  "generated_by": "ci-sbom-sca.yml",
+  "note": "This stub is kept in git; CI overwrites it on every run."
+}
