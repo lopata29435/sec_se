@@ -1,0 +1,30 @@
+# Waiver policy for SBOM/SCA findings
+# Based on project/69_sbom-vuln-mgmt.md guidance
+
+version: 1
+policy:
+  owner: "@security-team"
+  review_period_days: 30
+  approval_required: true
+  fail_on_severity: critical
+  notes: |
+    Use waivers only when there is no immediate fix. Revisit before expiry.
+
+waivers:
+  - id: "CVE-2024-99999"
+    package: "example-lib"
+    current_version: "1.2.3"
+    severity: "HIGH"
+    justification: "Upstream patch scheduled; non-exploitable in our context"
+    created: "2025-12-06"
+    expires: "2026-01-15"
+    owner: "@security-team"
+    ticket: "SEC-1234"
+    status: "approved"
+    scope: "dev"
+    references:
+      - "https://nvd.nist.gov/vuln/detail/CVE-2024-99999"
+      - "https://github.com/example/lib/issues/123"
+    conditions:
+      - "Monitor upstream release"
+      - "Re-scan after upgrade"
