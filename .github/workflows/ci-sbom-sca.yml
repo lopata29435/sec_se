@@ -27,8 +27,8 @@ env:
   SBOM_FILE: EVIDENCE/P09/sbom.json
   SCA_REPORT: EVIDENCE/P09/sca_report.json
   SCA_SUMMARY: EVIDENCE/P09/sca_summary.md
-  SYFT_IMAGE: anchore/syft:0.107.0
-  GRYPE_IMAGE: anchore/grype:0.80.0
+  SYFT_IMAGE: anchore/syft:latest
+  GRYPE_IMAGE: anchore/grype:latest
 
 jobs:
   sbom-sca:
