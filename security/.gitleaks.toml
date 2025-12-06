@@ -1,0 +1,13 @@
+title = "P10 gitleaks policy"
+
+[allowlist]
+  description = "Approved false positives and test secrets"
+  files = ["EVIDENCE/", "docs/"]
+  regexes = [
+    '''(?i)dummy-never-match''',
+  ]
+
+[[allowlist.entries]]
+  description = "Local dev DB URL with placeholder password"
+  regex = '''postgresql://user:password@localhost:5432/habit_tracker'''
+  tags = ["dev-placeholder", "non-sensitive"]

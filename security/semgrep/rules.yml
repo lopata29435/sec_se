@@ -1,0 +1,26 @@
+rules:
+  - id: app-insecure-eval
+    languages: [python]
+    severity: HIGH
+    message: "Avoid eval/exec; use safe alternatives"
+    patterns:
+      - pattern: "eval(...)"
+    metadata:
+      cwe: CWE-94
+      owasp: "A1: Injection"
+      impact: code_execution
+    fix: "Remove eval or replace with safe parser"
+
+  - id: app-requests-verify-disabled
+    languages: [python]
+    severity: MEDIUM
+    message: "requests with verify=False disables TLS cert validation"
+    patterns:
+      - pattern: "requests.$FUNC(..., verify=False, ...)"
+    metavariable-regex:
+      FUNC: "(?i)get|post|put|delete|head|options|patch"
+    metadata:
+      cwe: CWE-295
+      owasp: "A3: Sensitive Data Exposure"
+      impact: mitm
+    fix: "Remove verify=False or provide proper CA bundle"
