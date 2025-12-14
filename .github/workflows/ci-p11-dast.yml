@@ -56,10 +56,12 @@ jobs:
         uses: zaproxy/action-baseline@v0.8.0
         with:
           target: 'http://localhost:8000'
-          format: 'html,json'
-          output_dir: 'EVIDENCE/P11'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # pass extra cmd options to control report filenames
+          cmd_options: '-J report_json.json -r report_html.html'
+          artifact_name: 'dast-evidence-p11'
+          # use GHCR image to avoid Docker Hub pull issues/rate limits
+          docker_name: 'ghcr.io/zaproxy/zap2docker-stable'
 
       - name: Upload EVIDENCE artifact
         uses: actions/upload-artifact@v4
