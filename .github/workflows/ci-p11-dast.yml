@@ -60,6 +60,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Determine ZAP docker image
+        id: pick-image
+        run: |
+          set -e
+          echo "Trying to pull candidate ZAP images to find a valid tag..."
+          candidates=(
+            "ghcr.io/zaproxy/zap2docker-stable:latest"
+            "ghcr.io/zaproxy/zap2docker-stable:2.13.0"
+            "ghcr.io/zaproxy/zap2docker-stable:2.12.0"
+            "owasp/zap2docker-stable:latest"
+            "owasp/zap2docker-stable:2.13.0"
+            "owasp/zap2docker-stable:2.12.0"
+          )
+          for img in "${candidates[@]}"; do
+            echo "Attempting docker pull $img"
+            if docker pull "$img" >/dev/null 2>&1; then
+              echo "image=$img" >> "$GITHUB_OUTPUT"
+              echo "Selected $img"
+              exit 0
+            fi
+          done
+          # no image found; leave output empty so action will fall back to its default image
+          echo "image=" >> "$GITHUB_OUTPUT"
+
       - name: Run ZAP baseline scan
         uses: zaproxy/action-baseline@v0.8.0
         with:
@@ -68,8 +92,7 @@ jobs:
           # pass extra cmd options to control report filenames
           cmd_options: '-J report_json.json -r report_html.html'
           artifact_name: 'dast-evidence-p11'
-          # use GHCR image to avoid Docker Hub pull issues/rate limits
-          docker_name: 'ghcr.io/zaproxy/zap2docker-stable'
+          docker_name: ${{ steps.pick-image.outputs.image }}
 
       - name: Upload EVIDENCE artifact
         uses: actions/upload-artifact@v4
