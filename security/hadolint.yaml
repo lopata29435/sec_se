@@ -1,0 +1,9 @@
+# Custom hadolint rules for this project (example)
+# See: https://github.com/hadolint/hadolint/wiki
+ignored:
+  - DL3008  # prefer explicit apt-get update && apt-get upgrade handled in Dockerfile
+
+rules:
+  DL3006: error  # always use USER when possible (no root)
+  DL3007: warning # apt should use --no-install-recommends
+  DL3018: warning # pin versions in apt where possible

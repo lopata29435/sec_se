@@ -1,0 +1,11 @@
+# Checkov configuration for scanning k8s / terraform / compose
+skip_checks: []
+external_checks_dir: []
+soft_fail: false
+
+output:
+  - format: json
+
+checks:
+  k8s:
+    enabled: true

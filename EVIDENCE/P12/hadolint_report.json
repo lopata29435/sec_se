@@ -1,0 +1,8 @@
+{
+  "summary": {
+    "errors": 0,
+    "warnings": 1,
+    "info": 0
+  },
+  "notes": "Example hadolint report — real output will be created by CI run."
+}

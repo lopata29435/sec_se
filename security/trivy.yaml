@@ -1,0 +1,8 @@
+# Trivy config sample (placeholder). Adjust ad-hoc in CI if needed.
+vuln-type:
+  - os
+  - library
+severities:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
