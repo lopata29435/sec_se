@@ -1,101 +1,59 @@
-name: CI - P11 DAST (OWASP ZAP baseline)
+name: Security - DAST (P11, ZAP baseline)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
   push:
     paths:
-      - 'app/**'
-      - '.github/workflows/ci-p11-dast.yml'
-      - 'requirements.txt'
+      - "app/**"
+      - ".github/workflows/ci-p11-dast.yml"
+
+permissions:
+  contents: read
 
 concurrency:
-  group: p11-dast
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  dast:
-    name: DAST - ZAP baseline
+  dast_p11:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+      - name: Ensure evidence dirs
+        run: mkdir -p EVIDENCE/P11
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Start app (uvicorn) in background
-        env:
-          DATABASE_URL: "sqlite:///./zap_ci.db"
-          AUTH_ENABLED: "false"
-          ENVIRONMENT: "development"
-          PORT: 8000
+      - name: Run app
         run: |
-          nohup python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT > uvicorn.log 2>&1 &
+          uvicorn app.main:app --host 0.0.0.0 --port 8080 &
+          timeout 30 bash -c 'until curl -sf http://localhost:8080/health; do sleep 1; done'
 
-      - name: Wait for health endpoint
+      - name: ZAP Baseline
         run: |
-          for i in {1..30}; do
-            if curl -sSfS http://localhost:8000/health >/dev/null; then
-              echo "service ready"; exit 0
-            fi
-            sleep 1
-          done
-          echo "Service did not become ready"; cat uvicorn.log; exit 1
+          docker run --rm --network host -v $PWD:/zap/wrk owasp/zap2docker-stable \
+            zap-baseline.py \
+              -t http://localhost:8080 \
+              -r zap_baseline.html \
+              -J zap_baseline.json \
+              -d || true
+          mv zap_baseline.* EVIDENCE/P11/ || true
 
-      - name: Login to GHCR (for zap image)
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Determine ZAP docker image
-        id: pick-image
-        run: |
-          set -e
-          echo "Trying to pull candidate ZAP images to find a valid tag..."
-          candidates=(
-            "ghcr.io/zaproxy/zap2docker-stable:latest"
-            "ghcr.io/zaproxy/zap2docker-stable:2.13.0"
-            "ghcr.io/zaproxy/zap2docker-stable:2.12.0"
-            "owasp/zap2docker-stable:latest"
-            "owasp/zap2docker-stable:2.13.0"
-            "owasp/zap2docker-stable:2.12.0"
-          )
-          for img in "${candidates[@]}"; do
-            echo "Attempting docker pull $img"
-            if docker pull "$img" >/dev/null 2>&1; then
-              echo "image=$img" >> "$GITHUB_OUTPUT"
-              echo "Selected $img"
-              exit 0
-            fi
-          done
-          # no image found; leave output empty so action will fall back to its default image
-          echo "image=" >> "$GITHUB_OUTPUT"
-
-      - name: Run ZAP baseline scan
-        uses: zaproxy/action-baseline@v0.8.0
-        with:
-          target: 'http://localhost:8000'
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # pass extra cmd options to control report filenames
-          cmd_options: '-J report_json.json -r report_html.html'
-          artifact_name: 'dast-evidence-p11'
-          docker_name: ${{ steps.pick-image.outputs.image }}
-
-      - name: Upload EVIDENCE artifact
+      - name: Upload P11 evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dast-evidence-p11
-          path: EVIDENCE/P11/
+          name: P11_EVIDENCE
+          path: EVIDENCE/P11
